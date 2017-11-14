@@ -10,6 +10,10 @@ tcp_ser.c: the source file of the server in tcp transmission
 
 void str_ser(int sockfd, int error_rate, int data_len);     // transmitting and receiving function
 
+int min(int a, int b) {
+	return a < b ? a : b;
+}
+
 int main(int argc, char **argv)
 {
 	int sockfd, con_fd, ret;
@@ -40,7 +44,7 @@ int main(int argc, char **argv)
 	
 	my_addr.sin_family = AF_INET;
 	my_addr.sin_port = htons(port);
-	my_addr.sin_addr.s_addr = htonl(INADDR_ANY);//inet_addr("172.0.0.1");
+	my_addr.sin_addr.s_addr = inet_addr("192.168.43.57");//inet_addr("172.0.0.1");
 	bzero(&(my_addr.sin_zero), 8);
 	ret = bind(sockfd, (struct sockaddr *) &my_addr, sizeof(struct sockaddr));                //bind socket
 	if (ret <0)
@@ -83,10 +87,11 @@ int main(int argc, char **argv)
 void str_ser(int sockfd, int error_rate, int data_len)
 {
 	char buf[BUFSIZE];
+	char rev[2*data_len + HEADLEN];
 	FILE *fp;
 	struct ack_so ack;
 	struct pack_so pck;
-	int end, n = 0, multiple = 1, rand_num;
+	int end, n = 0, multiple = 1, rand_num, received_len, bound;
 	long lseek=0;
 	end = 0;
 	
@@ -96,11 +101,21 @@ void str_ser(int sockfd, int error_rate, int data_len)
 
 	while(!end)
 	{
-		if ((n = recv(sockfd, &pck, HEADLEN + multiple * data_len, 0)) == -1)                                   //receive the packet
-		{
-			printf("error when receiving\n");
-			exit(1);
+		received_len = 0;
+		bound = min(HEADLEN + multiple * data_len, HEADLEN + FILESIZE - (int)lseek);
+		while (received_len < bound) {
+			n = recv(sockfd, rev+received_len, HEADLEN + multiple * data_len, 0);
+			if (n == -1)                                   //receive the packet
+			{
+				printf("error when receiving\n");
+				exit(1);
+			}
+			else {
+				received_len += n;	
+			}
 		}
+
+		memcpy(&pck, rev, bound);
 
 		rand_num = (rand() % 100) + 1;
 
